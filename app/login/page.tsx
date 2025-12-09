@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState, useEffect } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -10,43 +9,48 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth-context" //
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const { login, user, isAuthenticated } = useAuth() // Use the global auth context
+
+  // [Fix] Watch for user state changes and redirect automatically
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Redirect based on role to avoid "Access Denied" on the wrong dashboard
+      if (user.role === 'admin') {
+        router.push("/admin/dashboard")
+      } else if (user.role === 'management') {
+        router.push("/management/dashboard")
+      } else {
+        router.push("/dashboard")
+      }
+    }
+  }, [isAuthenticated, user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    setIsLoading(true)
+    setIsLoggingIn(true)
 
     try {
-      console.log("[v0] Attempting login with email:", email)
-
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (authError) {
-        console.log("[v0] Auth error:", authError.message)
-        throw authError
-      }
-
-      console.log("[v0] Login successful, redirecting to dashboard")
-
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      router.push("/dashboard")
+      // Use the context login function instead of raw supabase calls
+      // This ensures all the global state logic in AuthProvider runs correctly
+      await login(email, password)
+      
+      // We do NOT redirect here manually. 
+      // The useEffect above will detect the successful login and handle it.
+      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Invalid credentials"
-      console.log("[v0] Login failed:", errorMessage)
+      console.log("Login failed:", errorMessage)
       setError(errorMessage)
-    } finally {
-      setIsLoading(false)
+      setIsLoggingIn(false) // Stop loading if error
     }
   }
 
@@ -89,8 +93,8 @@ export default function LoginPage() {
 
               {error && <div className="p-3 bg-destructive/10 text-destructive rounded text-sm">{error}</div>}
 
-              <Button className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign In"}
+              <Button className="w-full" disabled={isLoggingIn}>
+                {isLoggingIn ? "Signing in..." : "Sign In"}
               </Button>
             </form>
 

@@ -16,6 +16,7 @@ interface AnalyticsData {
   totalQuizzesTaken: number
   topCourses: { name: string; students: number }[]
   performanceByDifficulty: { level: string; score: number }[]
+  recentUsers: any[] // Added this field
 }
 
 export default function AnalyticsPage() {
@@ -40,7 +41,7 @@ export default function AnalyticsPage() {
     }
   }
 
-  // Fallback/Placeholder if data fails or is empty
+  // Fallback defaults
   const stats = data || {
     activeUsers: 0,
     totalUsers: 0,
@@ -50,6 +51,7 @@ export default function AnalyticsPage() {
     totalQuizzesTaken: 0,
     topCourses: [],
     performanceByDifficulty: [],
+    recentUsers: []
   }
 
   return (
@@ -60,7 +62,7 @@ export default function AnalyticsPage() {
           <div className="max-w-6xl mx-auto px-4">
             <div className="mb-8">
               <h1 className="text-4xl font-bold mb-2">Analytics & Reports</h1>
-              <p className="text-muted-foreground">View platform-wide analytics and real-time insights.</p>
+              <p className="text-muted-foreground">View platform-wide analytics and user activity.</p>
             </div>
 
             {isLoading ? (
@@ -81,47 +83,25 @@ export default function AnalyticsPage() {
                   <Card className="p-6">
                     <div className="text-sm text-muted-foreground mb-1">Avg Quiz Score</div>
                     <div className="text-3xl font-bold">{stats.avgScore}%</div>
-                    <p className="text-xs text-muted-foreground mt-2">Across all attempts</p>
                   </Card>
                   <Card className="p-6">
                     <div className="text-sm text-muted-foreground mb-1">Quizzes Taken</div>
                     <div className="text-3xl font-bold">{stats.totalQuizzesTaken}</div>
-                    <p className="text-xs text-muted-foreground mt-2">Total completions</p>
                   </Card>
                   <Card className="p-6">
-                    <div className="text-sm text-muted-foreground mb-1">New Users</div>
-                    <div className="text-3xl font-bold">+{stats.newUsersCount}</div>
-                    <p className="text-xs text-muted-foreground mt-2">This month</p>
+                    <div className="text-sm text-muted-foreground mb-1">Staff Count</div>
+                    <div className="text-3xl font-bold text-blue-600">{stats.managementCount}</div>
+                    <p className="text-xs text-muted-foreground mt-2">Admins & Managers</p>
                   </Card>
                 </div>
 
                 {/* Analytics Sections */}
                 <div className="grid lg:grid-cols-2 gap-6 mb-8">
                   <Card className="p-6">
-                    <h2 className="text-xl font-bold mb-4">User Growth</h2>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between mb-1 text-sm">
-                          <span>Active Students</span>
-                          <span>{stats.activeUsers}</span>
-                        </div>
-                        <div className="w-full bg-muted rounded h-2">
-                          <div 
-                            className="bg-primary h-2 rounded transition-all duration-500" 
-                            style={{ width: `${stats.totalUsers > 0 ? (stats.activeUsers / stats.totalUsers) * 100 : 0}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Showing proportion of active students vs total registered profiles.
-                      </p>
-                    </div>
-                  </Card>
-
-                  <Card className="p-6">
                     <h2 className="text-xl font-bold mb-4">Popular Categories</h2>
                     <div className="space-y-3 text-sm">
-                      {stats.topCourses.length > 0 ? (
+                      {/* FIX: Use optional chaining here */}
+                      {stats.topCourses?.length > 0 ? (
                         stats.topCourses.map((course, i) => (
                           <div key={i} className="flex justify-between items-center">
                             <span>{course.name}</span>
@@ -133,45 +113,32 @@ export default function AnalyticsPage() {
                       )}
                     </div>
                   </Card>
-                </div>
 
-                {/* Reports */}
-                <Card className="p-6">
-                  <h2 className="text-xl font-bold mb-4">Performance Summary</h2>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <h3 className="font-semibold mb-3">Average Score by Difficulty</h3>
-                      <div className="space-y-3 text-sm">
-                        {stats.performanceByDifficulty.map((item) => (
-                          <div key={item.level} className="flex justify-between items-center">
-                            <span className="capitalize text-muted-foreground">{item.level}</span>
-                            <span className="font-bold">{item.score}%</span>
+                  <Card className="p-6">
+                    <h2 className="text-xl font-bold mb-4">Recent Registrations</h2>
+                    <div className="space-y-3">
+                      {stats.recentUsers?.length > 0 ? (
+                        stats.recentUsers.map((user: any) => (
+                          <div key={user.id} className="flex justify-between items-center pb-2 border-b last:border-0">
+                            <div>
+                              <div className="font-medium text-sm">{user.first_name} {user.last_name}</div>
+                              <div className="text-xs text-muted-foreground">{user.email}</div>
+                            </div>
+                            <span className={`text-xs px-2 py-1 rounded capitalize ${
+                              user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                              user.role === 'management' ? 'bg-purple-100 text-purple-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {user.role}
+                            </span>
                           </div>
-                        ))}
-                        {stats.performanceByDifficulty.length === 0 && (
-                          <p className="text-muted-foreground">No performance data available.</p>
-                        )}
-                      </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground text-sm">No recent users.</p>
+                      )}
                     </div>
-                    <div>
-                      <h3 className="font-semibold mb-3">User Distribution</h3>
-                      <div className="space-y-3 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Students</span>
-                          <span className="font-bold">{stats.activeUsers}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Staff (Admin/Mgmt)</span>
-                          <span className="font-bold">{stats.managementCount}</span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2 mt-2">
-                          <span className="text-muted-foreground">Total Profiles</span>
-                          <span className="font-bold">{stats.totalUsers}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
+                  </Card>
+                </div>
               </>
             )}
           </div>

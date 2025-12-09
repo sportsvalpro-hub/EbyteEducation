@@ -1,9 +1,18 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+// 1. Change the type definition to Promise
+// 2. Await the params before using them
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> } 
+) {
   try {
     const supabase = await createClient()
+    
+    // FIX: Await the params object to get the actual ID
+    const { id } = await params
+    
     const body = await request.json()
 
     const {
@@ -24,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { data, error } = await supabase
       .from("profiles")
       .update({ status: body.status, role: body.role })
-      .eq("id", params.id)
+      .eq("id", id) // Use the awaited 'id' variable here
       .select()
 
     if (error) throw error

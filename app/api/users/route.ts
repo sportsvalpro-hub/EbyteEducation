@@ -2,12 +2,13 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { type NextRequest, NextResponse } from "next/server"
 
-// GET users (with optional status filter)
+// GET users (with optional status AND role filter)
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
+    const role = searchParams.get("role") // New param
 
     const {
       data: { user },
@@ -28,6 +29,16 @@ export async function GET(request: NextRequest) {
     if (status) {
       query = query.eq("status", status)
     }
+    
+    if (role && role !== "all") {
+      query = query.eq("role", role)
+    }
+
+    // Security: If requester is Management, prevent seeing Admins
+    if (profile.role === 'management') {
+       // Management can only see Users and other Management, not Admins
+       query = query.neq('role', 'admin')
+    }
 
     const { data, error } = await query
 
@@ -40,13 +51,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST new user (Manager adds Student)
+// POST remains the same as your previous code...
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient() // Client for auth check
+    const supabase = await createClient()
     const body = await request.json()
 
-    // 1. Verify the requester is allowed (Admin or Management)
     const {
       data: { user: requester },
     } = await supabase.auth.getUser()
@@ -61,35 +71,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
-    // 2. Use Service Role to create the new user (bypass standard auth limitations)
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Split name into first/last
     const nameParts = (body.name || "").split(" ")
     const firstName = nameParts[0] || ""
     const lastName = nameParts.slice(1).join(" ") || ""
 
-    // Create the user
     const { data: authData, error: authError } = await serviceClient.auth.admin.createUser({
       email: body.email,
-      password: body.password || Math.random().toString(36).slice(-8), // Generate random password if not provided
+      password: body.password || Math.random().toString(36).slice(-8),
       email_confirm: true,
       user_metadata: {
         first_name: firstName,
         last_name: lastName,
         role: body.role || "user",
-        status: "pending", // Explicitly set to pending
+        status: "pending",
         added_by: requester.email
       },
     })
 
-    if (authError) {
-      console.error("Auth creation error:", authError)
-      throw authError
-    }
+    if (authError) throw authError
 
     return NextResponse.json({ success: true, userId: authData.user.id }, { status: 201 })
   } catch (error) {

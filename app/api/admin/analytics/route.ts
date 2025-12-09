@@ -13,25 +13,31 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Verify admin role
+    // 1. Verify Role (Allow 'admin' AND 'management')
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-    if (profile?.role !== "admin") {
+    if (!["admin", "management"].includes(profile?.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
-    // 1. User Stats
+    // 2. Fetch User Stats
     // Total users
     const { count: totalUsers } = await supabase.from("profiles").select("*", { count: "exact", head: true })
 
-    // Active students (role = user & status = active)
+    // Active students
     const { count: activeStudents } = await supabase
       .from("profiles")
       .select("*", { count: "exact", head: true })
       .eq("role", "user")
       .eq("status", "active")
 
-    // Management/Admins
+    // Pending users (Direct count)
+    const { count: pendingUsers } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending")
+
+    // Management/Admins count
     const { count: managementCount } = await supabase
       .from("profiles")
       .select("*", { count: "exact", head: true })
@@ -47,7 +53,14 @@ export async function GET() {
       .select("*", { count: "exact", head: true })
       .gte("created_at", startOfMonth.toISOString())
 
-    // 2. Quiz/Activity Stats
+    // 3. Fetch Recent Users (To show who is who)
+    const { data: recentUsers } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name, email, role, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5)
+
+    // 4. Fetch Quiz/Activity Stats
     const { data: quizResults, error: resultsError } = await supabase
       .from("quiz_results")
       .select(`
@@ -62,16 +75,13 @@ export async function GET() {
 
     if (resultsError) throw resultsError
 
-    // Process results for analytics
+    // Process results
     const totalQuizzesTaken = quizResults?.length || 0
-    
-    // Average Score
     const totalScore = quizResults?.reduce((acc, curr) => acc + curr.score, 0) || 0
     const avgScore = totalQuizzesTaken > 0 ? Math.round(totalScore / totalQuizzesTaken) : 0
 
-    // Top Courses/Categories
+    // Top Courses logic
     const categoryStats: Record<string, number> = {}
-    // Difficulty Stats
     const difficultyStats: Record<string, { total: number; count: number }> = {
       easy: { total: 0, count: 0 },
       medium: { total: 0, count: 0 },
@@ -79,11 +89,9 @@ export async function GET() {
     }
 
     quizResults?.forEach((r: any) => {
-      // Count category popularity
       const cat = r.quiz?.category || "Uncategorized"
       categoryStats[cat] = (categoryStats[cat] || 0) + 1
 
-      // Track difficulty performance
       const diff = r.quiz?.difficulty || "medium"
       if (difficultyStats[diff]) {
         difficultyStats[diff].total += r.score
@@ -91,13 +99,11 @@ export async function GET() {
       }
     })
 
-    // Format Top Courses
     const topCourses = Object.entries(categoryStats)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 4)
       .map(([name, count]) => ({ name, students: count }))
 
-    // Format Performance by Difficulty
     const performanceByDifficulty = Object.entries(difficultyStats).map(([level, stats]) => ({
       level,
       score: stats.count > 0 ? Math.round(stats.total / stats.count) : 0
@@ -107,11 +113,13 @@ export async function GET() {
       activeUsers: activeStudents || 0,
       totalUsers: totalUsers || 0,
       managementCount: managementCount || 0,
+      pendingValidation: pendingUsers || 0,
       newUsersCount: newUsersCount || 0,
       avgScore,
       totalQuizzesTaken,
-      topCourses,
-      performanceByDifficulty
+      topCourses: topCourses || [], // Ensure this is always an array
+      performanceByDifficulty,
+      recentUsers: recentUsers || []
     })
   } catch (error) {
     console.error("Analytics error:", error)
