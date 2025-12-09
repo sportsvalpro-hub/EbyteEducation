@@ -9,24 +9,45 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useState } from "react"
+import { useAuth } from "@/lib/auth-context"
 
 export default function AddUsersPage() {
   const [formData, setFormData] = useState({ name: "", email: "", role: "user" })
-  const [users, setUsers] = useState<any[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState("")
+  const { user: currentUser } = useAuth()
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    const newUser = {
-      id: Date.now(),
-      ...formData,
-      status: "pending",
-      addedDate: new Date().toLocaleDateString(),
+    setIsSubmitting(true)
+    setError("")
+    setSubmitted(false)
+
+    try {
+      const response = await fetch("/api/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to add user")
+      }
+
+      setSubmitted(true)
+      setFormData({ name: "", email: "", role: "user" })
+      
+      // Reset success message after 3 seconds
+      setTimeout(() => setSubmitted(false), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
+      setIsSubmitting(false)
     }
-    setUsers([newUser, ...users])
-    setFormData({ name: "", email: "", role: "user" })
-    setSubmitted(true)
-    setTimeout(() => setSubmitted(false), 2000)
   }
 
   return (
@@ -81,53 +102,42 @@ export default function AddUsersPage() {
                       </select>
                     </div>
 
-                    <Button type="submit" className="w-full">
-                      Add User
-                    </Button>
+                    {error && (
+                      <div className="p-3 bg-red-100 text-red-800 rounded text-sm">{error}</div>
+                    )}
 
                     {submitted && (
-                      <div className="p-3 bg-green-100 text-green-800 rounded text-sm">User added successfully!</div>
+                      <div className="p-3 bg-green-100 text-green-800 rounded text-sm">
+                        User added successfully! Status is pending approval.
+                      </div>
                     )}
+
+                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                      {isSubmitting ? "Adding..." : "Add User"}
+                    </Button>
                   </form>
                 </Card>
               </div>
 
-              {/* Added Users List */}
+              {/* Instructions Panel */}
               <div className="lg:col-span-2">
                 <Card className="p-6">
-                  <h2 className="text-xl font-bold mb-4">Recently Added Users</h2>
-                  {users.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      No users added yet. Add your first user to get started.
+                  <h2 className="text-xl font-bold mb-4">How it works</h2>
+                  <div className="space-y-4 text-muted-foreground">
+                    <p>
+                      As a manager, you can register new users to the eByte Education platform.
                     </p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-border">
-                            <th className="text-left py-3 px-4 font-semibold">Name</th>
-                            <th className="text-left py-3 px-4 font-semibold">Email</th>
-                            <th className="text-left py-3 px-4 font-semibold">Role</th>
-                            <th className="text-left py-3 px-4 font-semibold">Status</th>
-                            <th className="text-left py-3 px-4 font-semibold">Date Added</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {users.map((user) => (
-                            <tr key={user.id} className="border-b border-border hover:bg-muted/50">
-                              <td className="py-3 px-4">{user.name}</td>
-                              <td className="py-3 px-4">{user.email}</td>
-                              <td className="py-3 px-4 capitalize">{user.role}</td>
-                              <td className="py-3 px-4">
-                                <span className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800">Pending</span>
-                              </td>
-                              <td className="py-3 px-4 text-sm text-muted-foreground">{user.addedDate}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <ul className="list-disc pl-5 space-y-2">
+                      <li>New users are created with a <strong>Pending</strong> status.</li>
+                      <li>Admins must review and <strong>Validate</strong> these accounts before they can access the platform.</li>
+                      <li>A temporary password is generated automatically. Users should reset it upon first login.</li>
+                    </ul>
+                    <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Note:</strong> You can view the status of all users in the <a href="/management/user-list" className="underline hover:text-blue-600">User List</a>.
+                      </p>
                     </div>
-                  )}
+                  </div>
                 </Card>
               </div>
             </div>

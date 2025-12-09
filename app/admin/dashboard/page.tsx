@@ -6,17 +6,36 @@ import { Footer } from "@/components/footer"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-
-const ADMIN_STATS = {
-  totalUsers: 365,
-  activeUsers: 342,
-  pendingValidation: 8,
-  totalCourses: 25,
-  totalQuizzes: 128,
-  averageScore: 81,
-}
+import { useEffect, useState } from "react"
 
 export default function AdminDashboardPage() {
+  // Simple stats state
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    pendingValidation: 0,
+  })
+
+  // Fetch quick stats on load
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch("/api/admin/analytics")
+        if (response.ok) {
+          const data = await response.json()
+          setStats({
+            totalUsers: data.totalUsers,
+            activeUsers: data.activeUsers,
+            pendingValidation: data.totalUsers - data.activeUsers - (data.managementCount || 0) // Approximation
+          })
+        }
+      } catch (e) {
+        console.error("Failed to load dashboard stats")
+      }
+    }
+    fetchStats()
+  }, [])
+
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <>
@@ -32,16 +51,16 @@ export default function AdminDashboardPage() {
             <div className="grid md:grid-cols-3 gap-4 mb-8">
               <Card className="p-6">
                 <div className="text-sm text-muted-foreground mb-1">Total Users</div>
-                <div className="text-3xl font-bold">{ADMIN_STATS.totalUsers}</div>
-                <p className="text-xs text-muted-foreground mt-2">{ADMIN_STATS.activeUsers} active</p>
+                <div className="text-3xl font-bold">{stats.totalUsers}</div>
+                <p className="text-xs text-muted-foreground mt-2">{stats.activeUsers} active students</p>
               </Card>
               <Card className="p-6">
-                <div className="text-sm text-muted-foreground mb-1">Pending Validation</div>
-                <div className="text-3xl font-bold text-yellow-600">{ADMIN_STATS.pendingValidation}</div>
+                <div className="text-sm text-muted-foreground mb-1">System Status</div>
+                <div className="text-3xl font-bold text-green-600">Healthy</div>
               </Card>
               <Card className="p-6">
-                <div className="text-sm text-muted-foreground mb-1">Platform Health</div>
-                <div className="text-3xl font-bold text-green-600">98%</div>
+                <div className="text-sm text-muted-foreground mb-1">Platform Access</div>
+                <div className="text-3xl font-bold text-primary">Admin</div>
               </Card>
             </div>
 
@@ -52,7 +71,12 @@ export default function AdminDashboardPage() {
                 <div className="space-y-3">
                   <Link href="/admin/validate-users" className="block">
                     <Button className="w-full justify-start bg-transparent" variant="outline">
-                      ✓ Validate Users ({ADMIN_STATS.pendingValidation})
+                      ✓ Validate New Signups
+                    </Button>
+                  </Link>
+                  <Link href="/admin/add-users" className="block">
+                    <Button className="w-full justify-start bg-transparent" variant="outline">
+                      ➕ Add Management/Staff
                     </Button>
                   </Link>
                 </div>
@@ -79,27 +103,9 @@ export default function AdminDashboardPage() {
                 <div className="space-y-3">
                   <Link href="/admin/analytics" className="block">
                     <Button className="w-full justify-start bg-transparent" variant="outline">
-                      📊 Analytics & Reports
+                      📊 View Platform Analytics
                     </Button>
                   </Link>
-                </div>
-              </Card>
-
-              <Card className="p-6">
-                <h2 className="text-xl font-bold mb-4">System Stats</h2>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Courses</span>
-                    <span className="font-bold">{ADMIN_STATS.totalCourses}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Quizzes</span>
-                    <span className="font-bold">{ADMIN_STATS.totalQuizzes}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Avg Student Score</span>
-                    <span className="font-bold">{ADMIN_STATS.averageScore}%</span>
-                  </div>
                 </div>
               </Card>
             </div>
