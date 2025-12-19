@@ -2,46 +2,38 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { type NextRequest, NextResponse } from "next/server"
 
-// GET users (with optional status AND role filter)
+// GET users
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
-    const role = searchParams.get("role") // New param
+    const role = searchParams.get("role")
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-
     if (!["admin", "management"].includes(profile?.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
-    let query = supabase.from("profiles").select("*").order("created_at", { ascending: false })
+    // UPDATED QUERY: Fetch user AND their manager's details (institute_name)
+    // We use the foreign key 'fk_profiles_added_by_profile' we created in SQL
+    let query = supabase
+      .from("profiles")
+      .select("*, manager:profiles!fk_profiles_added_by_profile(first_name, last_name, institute_name)")
+      .order("created_at", { ascending: false })
 
-    if (status) {
-      query = query.eq("status", status)
-    }
-    
-    if (role && role !== "all") {
-      query = query.eq("role", role)
-    }
+    if (status) query = query.eq("status", status)
+    if (role && role !== "all") query = query.eq("role", role)
 
-    // Security: If requester is Management, prevent seeing Admins
+    // Management users only see their own students
     if (profile.role === 'management') {
-       // Management can only see Users and other Management, not Admins
-       query = query.neq('role', 'admin')
+       query = query.eq('added_by', user.id)
     }
 
     const { data, error } = await query
-
     if (error) throw error
 
     return NextResponse.json(data)
@@ -51,22 +43,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST remains the same as your previous code...
+// POST: Create User
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const body = await request.json()
 
-    const {
-      data: { user: requester },
-    } = await supabase.auth.getUser()
-
-    if (!requester) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const { data: { user: requester } } = await supabase.auth.getUser()
+    if (!requester) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", requester.id).single()
-
     if (!["admin", "management"].includes(profile?.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
@@ -77,20 +63,26 @@ export async function POST(request: NextRequest) {
     )
 
     const nameParts = (body.name || "").split(" ")
-    const firstName = nameParts[0] || ""
-    const lastName = nameParts.slice(1).join(" ") || ""
+    
+    // Construct metadata
+    const userMetadata: any = {
+      first_name: nameParts[0] || "",
+      last_name: nameParts.slice(1).join(" ") || "",
+      role: body.role || "user",
+      status: "pending",
+      added_by: requester.id
+    }
+
+    // If creating a manager, save the institute name
+    if (body.role === 'management' && body.institute_name) {
+      userMetadata.institute_name = body.institute_name
+    }
 
     const { data: authData, error: authError } = await serviceClient.auth.admin.createUser({
       email: body.email,
       password: body.password || Math.random().toString(36).slice(-8),
       email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
-        role: body.role || "user",
-        status: "pending",
-        added_by: requester.email
-      },
+      user_metadata: userMetadata,
     })
 
     if (authError) throw authError

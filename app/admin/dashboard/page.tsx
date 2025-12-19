@@ -1,3 +1,5 @@
+// app/admin/dashboard/page.tsx
+
 "use client"
 
 import { ProtectedRoute } from "@/components/protected-route"
@@ -9,14 +11,12 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 
 export default function AdminDashboardPage() {
-  // Simple stats state
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
     pendingValidation: 0,
   })
 
-  // Fetch quick stats on load
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -26,7 +26,7 @@ export default function AdminDashboardPage() {
           setStats({
             totalUsers: data.totalUsers,
             activeUsers: data.activeUsers,
-            pendingValidation: data.totalUsers - data.activeUsers - (data.managementCount || 0) // Approximation
+            pendingValidation: data.totalUsers - data.activeUsers - (data.managementCount || 0)
           })
         }
       } catch (e) {
@@ -69,6 +69,11 @@ export default function AdminDashboardPage() {
               <Card className="p-6">
                 <h2 className="text-xl font-bold mb-4">User Management</h2>
                 <div className="space-y-3">
+                  <Link href="/admin/users" className="block">
+                    <Button className="w-full justify-start bg-transparent" variant="outline">
+                      👥 Manage All Users
+                    </Button>
+                  </Link>
                   <Link href="/admin/validate-users" className="block">
                     <Button className="w-full justify-start bg-transparent" variant="outline">
                       ✓ Validate New Signups

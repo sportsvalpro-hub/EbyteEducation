@@ -13,7 +13,13 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 export default function AdminAddUsersPage() {
-  const [formData, setFormData] = useState({ name: "", email: "", role: "management", password: "" })
+  const [formData, setFormData] = useState({ 
+    name: "", 
+    email: "", 
+    role: "management", 
+    password: "",
+    institute_name: "" // New field
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState("")
@@ -40,8 +46,14 @@ export default function AdminAddUsersPage() {
       }
 
       setSubmitted(true)
-      // Reset form but keep role selection for convenience
-      setFormData(prev => ({ name: "", email: "", role: prev.role, password: "" }))
+      // Reset form but keep role
+      setFormData(prev => ({ 
+        name: "", 
+        email: "", 
+        role: prev.role, 
+        password: "",
+        institute_name: "" 
+      }))
       
       setTimeout(() => setSubmitted(false), 4000)
     } catch (err) {
@@ -63,7 +75,7 @@ export default function AdminAddUsersPage() {
               </Link>
               <h1 className="text-4xl font-bold mb-2">Create Users</h1>
               <p className="text-muted-foreground">
-                Create new accounts for staff and students. Admin-created users are automatically activated.
+                Create new accounts. Define Institutes for Managers.
               </p>
             </div>
 
@@ -87,11 +99,27 @@ export default function AdminAddUsersPage() {
                       className="w-full px-3 py-2 border border-border rounded-md bg-background"
                     >
                       <option value="user">Student</option>
-                      <option value="management">Manager</option>
+                      <option value="management">Manager (Institute)</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
                 </div>
+
+                {/* Show Institute Name field ONLY for Management role */}
+                {formData.role === 'management' && (
+                  <div className="bg-primary/5 p-4 rounded-md border border-primary/20">
+                    <label className="block text-sm font-medium mb-2 text-primary">Institute Name</label>
+                    <Input
+                      value={formData.institute_name}
+                      onChange={(e) => setFormData({ ...formData, institute_name: e.target.value })}
+                      placeholder="e.g. Science Academy"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This name will be associated with all students added by this manager.
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Email</label>
@@ -112,9 +140,6 @@ export default function AdminAddUsersPage() {
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder="Leave empty to auto-generate"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    If left empty, a random password will be assigned.
-                  </p>
                 </div>
 
                 {error && (
@@ -125,7 +150,7 @@ export default function AdminAddUsersPage() {
 
                 {submitted && (
                   <div className="p-3 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 rounded text-sm">
-                    User created successfully! The account is active and ready to use.
+                    User created successfully!
                   </div>
                 )}
 

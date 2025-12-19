@@ -11,10 +11,15 @@ export function Navbar() {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const handleLogout = () => {
-    logout()
-    router.push("/")
-    setMobileMenuOpen(false)
+  // FIX: Make this async and await the logout action
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push("/login") // Redirect only after logout completes
+      setMobileMenuOpen(false)
+    } catch (error) {
+      console.error("Logout failed", error)
+    }
   }
 
   const getNavLinks = () => {
